@@ -45,14 +45,14 @@ const sendMessage = async (data: any) => {
     ws.send(JSON.stringify(preparedData));
     return promise;
 }
-export const depth = async (symbol: string, limit: number) => {
+export const depth = async (symbol: string, limit: number): Promise<IDepthResponse> => {
     return sendMessage({
         "method": "depth",
         "params": {
             "symbol": symbol,
             "limit": limit
         }
-    });
+    }) as Promise<IDepthResponse>;
 }
 
 export const ping = async () => {
