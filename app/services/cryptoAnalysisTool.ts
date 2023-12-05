@@ -28,6 +28,25 @@ const getCurrentTimestamp = () => {
     return Math.round(Date.now() / 1000);
 }
 
+const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: FuturesCandlestick[]): FuturesCandlestick[] => {
+    const result = [...candlesticks1];
+    const mapTimeToIndex = new Map();
+    for (let i in result) {
+        mapTimeToIndex.set(result[i].t, i);
+    }
+
+    for (let candle of candlesticks2) {
+        const index = mapTimeToIndex.get(candle.t);
+        if (index !== undefined) {
+            result[index] = candle;
+        } else {
+            result.push(candle);
+        }
+    }
+
+    return result;
+}
+
 (async () => {
     const pair = 'BTC_USDT';
 
@@ -42,7 +61,7 @@ const getCurrentTimestamp = () => {
     console.log('contract', contracts[0]);
 
     const cacheFileName = `./cache/gateio-${contracts[0].name}@${interval}`;
-    const futuresCandlesticksData = loadCandleStickCachedData(cacheFileName);
+    let futuresCandlesticksData = loadCandleStickCachedData(cacheFileName);
 
 
     let lastTimestamp = futuresCandlesticksData.length > 0 ?
@@ -53,9 +72,14 @@ const getCurrentTimestamp = () => {
 
     console.log('last candle time', new Date(lastTimestamp * 1000));
 
-    while (lastTimestamp - chunkTime < getCurrentTimestamp()) {
-        const from = lastTimestamp + 1;
-        const to = lastTimestamp + chunkTime;
+    let stop = false;
+    while (!stop) {
+        if (lastTimestamp > getCurrentTimestamp()) {
+            lastTimestamp = getCurrentTimestamp();
+            stop = true;
+        }
+        const from = lastTimestamp - chunkTime;
+        const to = lastTimestamp;
         console.log('getting from to', new Date(from * 1000), new Date(to * 1000));
         const opts: TListFuturesCandlesticksOpt = {
             'from': from,
@@ -63,12 +87,10 @@ const getCurrentTimestamp = () => {
             'interval': interval
         };
         const {body: candlesticks} = await futuresApi.listFuturesCandlesticks(settle, contracts[0].name || '', opts);
-        futuresCandlesticksData.push(...candlesticks);
+        futuresCandlesticksData = mergeCandleSticks(futuresCandlesticksData, candlesticks);
         writeFileSync(cacheFileName, JSON.stringify(futuresCandlesticksData));
 
         lastTimestamp += chunkTime;
     }
     console.log(futuresCandlesticksData.length);
-
-
 })();
