@@ -39,6 +39,7 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
 }
 
 (async () => {
+    //load data from gate.io
     const pair = 'BTC_USDT';
 
     const client = new ApiClient();
@@ -84,5 +85,51 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
 
         lastTimestamp += chunkTime;
     }
-    console.log(futuresCandlesticksData.length);
+    console.log('Total candlesticks', futuresCandlesticksData.length);
+
+
+
+    //analyze
+    type ResultAnalyzedData = {
+        extremumIndexes: number[]
+    }
+    const windowSizes = [4 * 12, 16 * 12, 256 * 12]; //4 hours, 16 hours, ~10 days
+    const windowsSizeToData = new Map<number, ResultAnalyzedData>();
+    for (let ws of windowSizes) {
+        windowsSizeToData.set(ws, {extremumIndexes: []});
+    }
+
+    for (let i= 0; i <  futuresCandlesticksData.length; i++) {
+        const candle = futuresCandlesticksData[i];
+        for (let windowSize of windowSizes) {
+            const data = windowsSizeToData.get(windowSize);
+            if (!data) {
+                continue;
+            }
+            if (i < windowSize) {
+                continue;
+            }
+            if (data.extremumIndexes.length === 0) {
+                let minIndex = i - windowSize;
+                let maxIndex = i - windowSize;
+                for (let j = i - windowSize + 1; j <= i; j++) {
+                    if (futuresCandlesticksData[minIndex] > futuresCandlesticksData[j]) {
+                        minIndex = j;
+                    }
+                    if (futuresCandlesticksData[maxIndex] < futuresCandlesticksData[j]) {
+                        maxIndex = j;
+                    }
+                }
+                if (minIndex < maxIndex) {
+                    data.extremumIndexes.push(minIndex, maxIndex);
+                } else {
+                    data.extremumIndexes.push(maxIndex, minIndex);
+                }
+            } else {
+                const prevIndex1 = data.extremumIndexes[data.extremumIndexes.length - 1];
+                const prevIndex2 = data.extremumIndexes[data.extremumIndexes.length - 2];
+            }
+        }
+    }
+
 })();
