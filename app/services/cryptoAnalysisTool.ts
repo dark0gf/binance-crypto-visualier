@@ -1,6 +1,7 @@
 import { writeFile, readFileSync } from 'node:fs';
 import {ApiClient, FuturesApi, FuturesCandlestick} from 'gate-api';
 import {writeFileSync} from "fs";
+import {createJSONFileManager} from "@/app/services/utils";
 
 const interval = "5m";
 const startBackFrom = 365 * 24 * 60 * 60; //1 year
@@ -13,16 +14,6 @@ type TListFuturesCandlesticksOpt = {
     interval?: '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | '2h' | '4h' | '6h' | '8h' | '12h' | '1d' | '7d' | '1w' | '30d';
 }
 
-const loadCandleStickCachedData = (cacheFileName: string) => {
-    let futuresCandlesticksData: FuturesCandlestick[] = [];
-    try {
-        const fileData = readFileSync(cacheFileName).toString();
-        futuresCandlesticksData = JSON.parse(fileData);
-    } catch (e) {
-        throw e;
-    }
-    return futuresCandlesticksData;
-}
 
 const getCurrentTimestamp = () => {
     return Math.round(Date.now() / 1000);
@@ -60,8 +51,9 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
 
     console.log('contract', contracts[0]);
 
-    const cacheFileName = `./cache/gateio-${contracts[0].name}@${interval}`;
-    let futuresCandlesticksData = loadCandleStickCachedData(cacheFileName);
+    const {save: saveData, load: loadData} = createJSONFileManager<FuturesCandlestick[]>(`./cache/gateio-${contracts[0].name}@${interval}`);
+
+    let futuresCandlesticksData = loadData();
 
 
     let lastTimestamp = futuresCandlesticksData.length > 0 ?
@@ -88,7 +80,7 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
         };
         const {body: candlesticks} = await futuresApi.listFuturesCandlesticks(settle, contracts[0].name || '', opts);
         futuresCandlesticksData = mergeCandleSticks(futuresCandlesticksData, candlesticks);
-        writeFileSync(cacheFileName, JSON.stringify(futuresCandlesticksData));
+        saveData(futuresCandlesticksData);
 
         lastTimestamp += chunkTime;
     }
