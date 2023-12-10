@@ -38,6 +38,23 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
     return result;
 }
 
+const findMinMaxCandle = (candles: FuturesCandlestick[], startFromIndex: number, min: boolean) => {
+    let result = startFromIndex;
+    for (let i = startFromIndex; i < candles.length; i++) {
+        if (min) {
+            // @ts-ignore
+            if (candles[i].l < candles[result].l) {
+                result = i;
+            }
+        } else {
+            // @ts-ignore
+            if (candles[i].t > candles[result].t) {
+                result = i;
+            }
+        }
+    }
+}
+
 (async () => {
     //load data from gate.io
     const pair = 'BTC_USDT';
@@ -106,10 +123,11 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
             if (!data) {
                 continue;
             }
-            if (i < windowSize) {
+            if (currentIndex < windowSize) {
                 continue;
             }
             if (data.extremumIndexes.length === 0) {
+                //empty array, starting to fill with first 2 items
                 let minIndex = currentIndex - windowSize;
                 let maxIndex = currentIndex - windowSize;
                 for (let j = currentIndex - windowSize + 1; j <= currentIndex; j++) {
@@ -131,21 +149,23 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
                 if (!futuresCandlesticksData[prevIndex1] || !futuresCandlesticksData[prevIndex2]) {
                     throw Error(`Out of bounds ${prevIndex1} ${prevIndex2} ${futuresCandlesticksData.length}`);
                 }
+
+                if (prevIndex2 < currentIndex - windowSize) {
+                    let minValueIndex = prevIndex1 + 1;
+                    for (let k = prevIndex1 + 1; k <= currentIndex; k++) {
+                        // @ts-ignore
+                        if (futuresCandlesticksData[k].l < futuresCandlesticksData[minValueIndex].l) {
+                            minValueIndex = k;
+                        }
+                    }
+                    data.extremumIndexes.push(minValueIndex);
+                } else {
+
+                }
+
                 // @ts-ignore
                 if (futuresCandlesticksData[prevIndex1].t > futuresCandlesticksData[prevIndex2].t) {
                     //last extremum is high and before last is low
-                    if (prevIndex2 < currentIndex - windowSize) {
-                        let minValueIndex = prevIndex1 + 1;
-                        for (let k = prevIndex1 + 1; k <= currentIndex; k++) {
-                            // @ts-ignore
-                            if (futuresCandlesticksData[k].l < futuresCandlesticksData[minValueIndex].l) {
-                                minValueIndex = k;
-                            }
-                        }
-                        data.extremumIndexes.push(minValueIndex);
-                    } else {
-
-                    }
                 }
             }
         }
