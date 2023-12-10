@@ -38,9 +38,9 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
     return result;
 }
 
-const findMinMaxCandle = (candles: FuturesCandlestick[], startFromIndex: number, min: boolean) => {
+const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: number, toIndex: number, min: boolean): number => {
     let result = startFromIndex;
-    for (let i = startFromIndex; i < candles.length; i++) {
+    for (let i = startFromIndex; i <= toIndex; i++) {
         if (min) {
             // @ts-ignore
             if (candles[i].l < candles[result].l) {
@@ -53,6 +53,7 @@ const findMinMaxCandle = (candles: FuturesCandlestick[], startFromIndex: number,
             }
         }
     }
+    return result;
 }
 
 (async () => {
@@ -117,7 +118,6 @@ const findMinMaxCandle = (candles: FuturesCandlestick[], startFromIndex: number,
     }
 
     for (let currentIndex= 0; currentIndex <  futuresCandlesticksData.length; currentIndex++) {
-        const candle = futuresCandlesticksData[currentIndex];
         for (let windowSize of windowSizes) {
             const data = windowsSizeToData.get(windowSize);
             if (!data) {
@@ -128,16 +128,8 @@ const findMinMaxCandle = (candles: FuturesCandlestick[], startFromIndex: number,
             }
             if (data.extremumIndexes.length === 0) {
                 //empty array, starting to fill with first 2 items
-                let minIndex = currentIndex - windowSize;
-                let maxIndex = currentIndex - windowSize;
-                for (let j = currentIndex - windowSize + 1; j <= currentIndex; j++) {
-                    if (futuresCandlesticksData[minIndex] > futuresCandlesticksData[j]) {
-                        minIndex = j;
-                    }
-                    if (futuresCandlesticksData[maxIndex] < futuresCandlesticksData[j]) {
-                        maxIndex = j;
-                    }
-                }
+                let minIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, true);
+                let maxIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, false);
                 if (minIndex < maxIndex) {
                     data.extremumIndexes.push(minIndex, maxIndex);
                 } else {
@@ -150,25 +142,17 @@ const findMinMaxCandle = (candles: FuturesCandlestick[], startFromIndex: number,
                     throw Error(`Out of bounds ${prevIndex1} ${prevIndex2} ${futuresCandlesticksData.length}`);
                 }
 
-                if (prevIndex2 < currentIndex - windowSize) {
-                    let minValueIndex = prevIndex1 + 1;
-                    for (let k = prevIndex1 + 1; k <= currentIndex; k++) {
-                        // @ts-ignore
-                        if (futuresCandlesticksData[k].l < futuresCandlesticksData[minValueIndex].l) {
-                            minValueIndex = k;
-                        }
-                    }
-                    data.extremumIndexes.push(minValueIndex);
-                } else {
-
-                }
-
                 // @ts-ignore
-                if (futuresCandlesticksData[prevIndex1].t > futuresCandlesticksData[prevIndex2].t) {
-                    //last extremum is high and before last is low
+                let searchNextMin = futuresCandlesticksData[prevIndex2].l < futuresCandlesticksData[prevIndex1].l
+                if (prevIndex2 < currentIndex - windowSize) {
+                    const nextLocalExtremumIndex = findMinMaxCandleIndex(futuresCandlesticksData, prevIndex1 + 1, currentIndex, searchNextMin);
+                    data.extremumIndexes.push(nextLocalExtremumIndex);
+                } else {
+                    data.extremumIndexes[data.extremumIndexes.length - 1] = findMinMaxCandleIndex(futuresCandlesticksData, prevIndex1, currentIndex, !searchNextMin);
                 }
             }
         }
     }
+    console.log(windowsSizeToData);
 
 })();
