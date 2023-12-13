@@ -1,6 +1,4 @@
-import { writeFile, readFileSync } from 'node:fs';
 import {ApiClient, FuturesApi, FuturesCandlestick} from 'gate-api';
-import {writeFileSync} from "fs";
 import {createJSONFileManager} from "@/app/services/utils";
 
 const interval = "5m";
@@ -69,8 +67,9 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
     console.log(contracts.length);
 
     console.log('contract', contracts[0]);
+    const cacheFilename = `./cache/gateio-${contracts[0].name}@${interval}`;
 
-    const {save: saveData, load: loadData} = createJSONFileManager<FuturesCandlestick[]>(`./cache/gateio-${contracts[0].name}@${interval}`);
+    const {save: saveData, load: loadData} = createJSONFileManager<FuturesCandlestick[]>(cacheFilename);
 
     let futuresCandlesticksData = loadData();
 
@@ -155,4 +154,6 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
     }
     console.log(windowsSizeToData);
 
+    const {save: saveDataAnalysis} = createJSONFileManager(`${cacheFilename}@analysis`);
+    saveDataAnalysis(Object.fromEntries(windowsSizeToData));
 })();
