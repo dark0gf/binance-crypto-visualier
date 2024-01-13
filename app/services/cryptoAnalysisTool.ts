@@ -1,7 +1,8 @@
 import {ApiClient, FuturesApi, FuturesCandlestick} from 'gate-api';
-import {createJSONFileManager} from "@/app/services/utils";
+import {createJSONFileManager, gateioInterval, gateioSourceName, generateFileName} from "@/app/services/utils";
+import {getCandlesticks, getContracts} from "@/app/services/gateioFutures";
 
-const interval = "5m";
+
 const startBackFrom = 365 * 24 * 60 * 60; //1 year
 const chunkTime = 5 * 24 * 60 * 60; //5 days
 
@@ -56,18 +57,11 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
 
 (async () => {
     //load data from gate.io
-    const pair = 'BTC_USDT';
-
-    const client = new ApiClient();
-
-    const futuresApi = new FuturesApi(client);
-    const settle = "usdt"; // 'btc' | 'usdt' | 'usd' | Settle currency
-
-    const {body: contracts} = await futuresApi.listFuturesContracts(settle);
+    const contracts = await getContracts();
     console.log(contracts.length);
 
     console.log('contract', contracts[0]);
-    const cacheFilename = `./cache/gateio-${contracts[0].name}@${interval}`;
+    const cacheFilename = generateFileName(gateioSourceName, contracts[0].name || '', gateioInterval, false);
 
     const {save: saveData, load: loadData} = createJSONFileManager<FuturesCandlestick[]>(cacheFilename);
 
@@ -94,9 +88,10 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
         const opts: TListFuturesCandlesticksOpt = {
             'from': from,
             'to': to,
-            'interval': interval
+            'interval': gateioInterval
         };
-        const {body: candlesticks} = await futuresApi.listFuturesCandlesticks(settle, contracts[0].name || '', opts);
+
+        const candlesticks = await getCandlesticks(contracts[0].name || '', opts);
         futuresCandlesticksData = mergeCandleSticks(futuresCandlesticksData, candlesticks);
         saveData(futuresCandlesticksData);
 
@@ -154,6 +149,6 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
     }
     console.log(windowsSizeToData);
 
-    const {save: saveDataAnalysis} = createJSONFileManager(`${cacheFilename}@analysis`);
+    const {save: saveDataAnalysis} = createJSONFileManager(generateFileName(gateioSourceName, contracts[0].name || '', gateioInterval, true));
     saveDataAnalysis(Object.fromEntries(windowsSizeToData));
 })();
