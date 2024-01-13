@@ -3,10 +3,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import {gateioInterval, gateioSourceName, generateFileName} from "@/app/services/utils";
 import {getContracts} from "@/app/services/gateioFutures";
 
-type ResponseData = {
-    message: string
-}
-
 export async function GET(req: NextApiRequest) {
     const contracts = await getContracts();
 
@@ -22,8 +18,6 @@ export async function GET(req: NextApiRequest) {
             result.push(contract.name || '');
         }
     }
-
-
 
     return Response.json({contracts:  result});
 }
