@@ -17,6 +17,7 @@
     "@types/react-dom": "18.2.7",
     "@types/three": "^0.155.1",
     "autoprefixer": "10.4.15",
+    "axios": "^1.6.5",
     "binance-api-node": "^0.12.6",
     "eslint": "8.47.0",
     "eslint-config-next": "^14.0.4",

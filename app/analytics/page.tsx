@@ -7,12 +7,6 @@ export default function Analysis() {
     useEffect(() => {
         (async () => {
             const {default: Chart} = await import('./Chart');
-
-            const TestChart = function TestChart() {
-                return <>Hi!</>
-            }
-            console.log(<Chart />);
-            console.log(<TestChart />);
             setChart(<Chart />);
         })();
 

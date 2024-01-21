@@ -3,7 +3,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import {gateioInterval, gateioSourceName, generateFileName} from "@/app/services/utils";
 import {getContracts} from "@/app/services/gateioFutures";
 
+let cacheContractsResult: any;
+
 export async function GET(req: NextApiRequest) {
+    if (cacheContractsResult) {
+        return Response.json({contracts:  cacheContractsResult});
+    }
     const contracts = await getContracts();
 
     const result: string[] = [];
@@ -18,7 +23,7 @@ export async function GET(req: NextApiRequest) {
             result.push(contract.name || '');
         }
     }
-
+    cacheContractsResult = result;
     return Response.json({contracts:  result});
 }
 
