@@ -1,6 +1,7 @@
 import {ApiClient, FuturesApi, FuturesCandlestick} from 'gate-api';
 import {createJSONFileManager, gateioInterval, gateioSourceName, generateFileName} from "@/app/services/utils";
 import {getCandlesticks, getContracts} from "@/app/services/gateioFutures";
+import {ResultAnalyzedData} from "@/app/types/analysis";
 
 
 const startBackFrom = 365 * 24 * 60 * 60; //1 year
@@ -67,12 +68,12 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
 
     let futuresCandlesticksData = loadData();
 
+    futuresCandlesticksData = futuresCandlesticksData ?? [];
+
 
     let lastTimestamp = futuresCandlesticksData.length > 0 ?
         futuresCandlesticksData[futuresCandlesticksData.length - 1].t || 0 :
         getCurrentTimestamp() - startBackFrom;
-
-    console.log(futuresCandlesticksData[futuresCandlesticksData.length - 1]);
 
     console.log('last candle time', new Date(lastTimestamp * 1000));
 
@@ -102,9 +103,8 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
 
 
     //analyze
-    type ResultAnalyzedData = {
-        extremumIndexes: number[]
-    }
+
+
     const windowSizes = [4 * 12, 16 * 12, 64 * 12, 256 * 12]; //4 hours, 16 hours, ~2,5 day, ~10 days
     const windowsSizeToData = new Map<number, ResultAnalyzedData>();
     for (let ws of windowSizes) {
@@ -125,24 +125,24 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
                 let minIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, true);
                 let maxIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, false);
                 if (minIndex < maxIndex) {
-                    data.extremumIndexes.push(minIndex, maxIndex);
+                    data.extremumIndexes.push({isMax: false, i: minIndex}, {isMax: true, i: maxIndex});
                 } else {
-                    data.extremumIndexes.push(maxIndex, minIndex);
+                    data.extremumIndexes.push({isMax: true, i: maxIndex}, {isMax: false, i: minIndex});
                 }
             } else {
-                const prevIndex1 = data.extremumIndexes[data.extremumIndexes.length - 1];
-                const prevIndex2 = data.extremumIndexes[data.extremumIndexes.length - 2];
-                if (!futuresCandlesticksData[prevIndex1] || !futuresCandlesticksData[prevIndex2]) {
-                    throw Error(`Out of bounds ${prevIndex1} ${prevIndex2} ${futuresCandlesticksData.length}`);
+                const prevExtremum1 = data.extremumIndexes[data.extremumIndexes.length - 1];
+                const prevExtremum2 = data.extremumIndexes[data.extremumIndexes.length - 2];
+                if (!futuresCandlesticksData[prevExtremum1.i] || !futuresCandlesticksData[prevExtremum2.i]) {
+                    throw Error(`Out of bounds ${prevExtremum1.i} ${prevExtremum2.i} ${futuresCandlesticksData.length}`);
                 }
 
                 // @ts-ignore
-                let searchNextMin = futuresCandlesticksData[prevIndex2].l < futuresCandlesticksData[prevIndex1].l
-                if (prevIndex2 < currentIndex - windowSize) {
-                    const nextLocalExtremumIndex = findMinMaxCandleIndex(futuresCandlesticksData, prevIndex1 + 1, currentIndex, searchNextMin);
-                    data.extremumIndexes.push(nextLocalExtremumIndex);
+                let isPrevMax = data.extremumIndexes[data.extremumIndexes.length - 1].isMax;//futuresCandlesticksData[prevIndex2].l < futuresCandlesticksData[prevIndex1].l
+                if (prevExtremum2.i < currentIndex - windowSize) {
+                    const nextLocalExtremumIndex = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i + 1, currentIndex, isPrevMax);
+                    data.extremumIndexes.push({isMax: !isPrevMax, i: nextLocalExtremumIndex});
                 } else {
-                    data.extremumIndexes[data.extremumIndexes.length - 1] = findMinMaxCandleIndex(futuresCandlesticksData, prevIndex1, currentIndex, !searchNextMin);
+                    data.extremumIndexes[data.extremumIndexes.length - 1].i = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i, currentIndex, !isPrevMax);
                 }
             }
         }
