@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import {createJSONFileManager, gateioInterval, gateioSourceName, generateFileName} from "@/app/services/utils";
+import {gateioInterval, gateioSourceName} from "@/app/services/utils";
 import {FuturesCandlestick} from "gate-api";
+import {createJSONFileManager, generateFileName} from "@/app/services/utilsIO";
 
 type ResponseData = {
     message: string
