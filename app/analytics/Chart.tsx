@@ -3,6 +3,7 @@ import React from "react";
 import {useAsyncEffect} from "@/app/services/hooks";
 import axios from "axios";
 import {FuturesCandlestick} from "gate-api";
+import {ResultAnalyzedData} from "@/app/types/analysis";
 const trace1 = {
     x: ['2017-01-04', '2017-01-05', '2017-01-06', '2017-01-09', '2017-01-10', '2017-01-11', '2017-01-12', '2017-01-13', '2017-01-17', '2017-01-18', '2017-01-19', '2017-01-20', '2017-01-23', '2017-01-24', '2017-01-25', '2017-01-26', '2017-01-27', '2017-01-30', '2017-01-31', '2017-02-01', '2017-02-02', '2017-02-03', '2017-02-06', '2017-02-07', '2017-02-08', '2017-02-09', '2017-02-10', '2017-02-13', '2017-02-14', '2017-02-15'],
     close: [116.019997, 116.610001, 117.910004, 118.989998, 119.110001, 119.75, 119.25, 119.040001, 120, 119.989998, 119.779999, 120, 120.080002, 119.970001, 121.879997, 121.940002, 121.949997, 121.629997, 121.349998, 128.75, 128.529999, 129.080002, 130.289993, 131.529999, 132.039993, 132.419998, 132.119995, 133.289993, 135.020004, 135.509995],
@@ -19,7 +20,7 @@ const data = [trace1];
 const layout = {
     // dragmode: 'zoom',
     margin: {
-        r: 100,
+        r: 200,
         t: 40,
         b: 40,
         l: 40
@@ -41,25 +42,9 @@ export default function Chart() {
         const contract = resContracts.data.contracts[0]
         console.log(contract);
 
-        const resAnalytics = await axios.get(`/api/analytics/result?contract=${contract}`);
+        const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: ResultAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
         console.log(resAnalytics.data);
-        const candles: FuturesCandlestick[] = resAnalytics.data.candles;
-        // const traceCandles: any = {
-        //     x: [],
-        //     open: [],
-        //     close: [],
-        //     low: [],
-        //     high: [],
-        //     type: 'candlestixck',
-        //     xaxis: 'x',
-        //     yaxis: 'y'
-        // };
-        //var trace2 = {
-        //   x: [2, 3, 4, 5],
-        //   y: [16, 5, 11, 9],
-        //   mode: 'lines',
-        //   name: 'Lines'
-        // };
+        const candles = resAnalytics.data.candles;
         const tradeHigh: any = {
             x: [],
             y: [],
@@ -101,13 +86,27 @@ export default function Chart() {
                 },
                 name: i,
             };
+            // let isLastHigh = false;
+            // if (result.extremumIndexes.length > 1) {
+            //     const firstExtremum = result.extremumIndexes[0];
+            //     const secondExtremum = result.extremumIndexes[1];
+            //     if ((candles[firstIndex].t || 0) > (candles[secondIndex].t || 0)) {
+            //         isLastHigh = false;
+            //     }
+            // }
             for (let e of result.extremumIndexes) {
                     // if (!candles[e]) {
                     //     console.warn('index', e, 'does not exists, window size ', i);
                     //     continue;
                     // }
-                traceResult.x.push((candles[e].t || 0) * 1000);
-                traceResult.y.push(candles[e].o);
+
+                traceResult.x.push((candles[e.i].t || 0) * 1000);
+                if (e.isMax) {
+                    traceResult.y.push(candles[e.i].h);
+                } else {
+                    traceResult.y.push(candles[e.i].l);
+                }
+
             }
             tracesResults.push(traceResult);
         }

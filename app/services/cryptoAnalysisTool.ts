@@ -1,4 +1,4 @@
-import {ApiClient, FuturesApi, FuturesCandlestick} from 'gate-api';
+import {FuturesCandlestick} from 'gate-api';
 import {createJSONFileManager, gateioInterval, gateioSourceName, generateFileName} from "@/app/services/utils";
 import {getCandlesticks, getContracts} from "@/app/services/gateioFutures";
 import {ResultAnalyzedData} from "@/app/types/analysis";
@@ -43,12 +43,12 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
     for (let i = startFromIndex; i <= toIndex; i++) {
         if (min) {
             // @ts-ignore
-            if (candles[i].l < candles[result].l) {
+            if (parseFloat(candles[i].l) < parseFloat(candles[result].l)) {
                 result = i;
             }
         } else {
             // @ts-ignore
-            if (candles[i].t > candles[result].t) {
+            if (parseFloat(candles[i].h) > parseFloat(candles[result].h)) {
                 result = i;
             }
         }
@@ -103,8 +103,6 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
 
 
     //analyze
-
-
     const windowSizes = [4 * 12, 16 * 12, 64 * 12, 256 * 12]; //4 hours, 16 hours, ~2,5 day, ~10 days
     const windowsSizeToData = new Map<number, ResultAnalyzedData>();
     for (let ws of windowSizes) {
@@ -125,9 +123,11 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
                 let minIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, true);
                 let maxIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, false);
                 if (minIndex < maxIndex) {
-                    data.extremumIndexes.push({isMax: false, i: minIndex}, {isMax: true, i: maxIndex});
+                    const change = parseFloat(futuresCandlesticksData[maxIndex].h || '1') / parseFloat(futuresCandlesticksData[minIndex].l || '1');
+                    data.extremumIndexes.push({isMax: false, i: minIndex, change: 0}, {isMax: true, i: maxIndex, change});
                 } else {
-                    data.extremumIndexes.push({isMax: true, i: maxIndex}, {isMax: false, i: minIndex});
+                    const change = parseFloat(futuresCandlesticksData[minIndex].l || '1') / parseFloat(futuresCandlesticksData[maxIndex].h || '1');
+                    data.extremumIndexes.push({isMax: true, i: maxIndex, change: 0}, {isMax: false, i: minIndex, change});
                 }
             } else {
                 const prevExtremum1 = data.extremumIndexes[data.extremumIndexes.length - 1];
@@ -137,12 +137,27 @@ const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: nu
                 }
 
                 // @ts-ignore
-                let isPrevMax = data.extremumIndexes[data.extremumIndexes.length - 1].isMax;//futuresCandlesticksData[prevIndex2].l < futuresCandlesticksData[prevIndex1].l
+                let isPrevMax = prevExtremum1.isMax;//futuresCandlesticksData[prevIndex2].l < futuresCandlesticksData[prevIndex1].l
                 if (prevExtremum2.i < currentIndex - windowSize) {
                     const nextLocalExtremumIndex = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i + 1, currentIndex, isPrevMax);
-                    data.extremumIndexes.push({isMax: !isPrevMax, i: nextLocalExtremumIndex});
+                    const nextLocalExtremumCandle = futuresCandlesticksData[nextLocalExtremumIndex];
+                    const isMax = !isPrevMax;
+                    let change
+                    if (isMax) {
+                        change = parseFloat(nextLocalExtremumCandle.h || '1') / parseFloat(futuresCandlesticksData[prevExtremum1.i].l || '1')
+                    } else {
+                        change = parseFloat(nextLocalExtremumCandle.l || '1') / parseFloat(futuresCandlesticksData[prevExtremum1.i].h || '1')
+                    }
+                    data.extremumIndexes.push({isMax, i: nextLocalExtremumIndex, change});
                 } else {
-                    data.extremumIndexes[data.extremumIndexes.length - 1].i = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i, currentIndex, !isPrevMax);
+                    let change;
+                    if (prevExtremum1.isMax) {
+                        change = parseFloat(futuresCandlesticksData[prevExtremum1.i].h || '1') / parseFloat(futuresCandlesticksData[prevExtremum2.i].l || '1')
+                    } else {
+                        change = parseFloat(futuresCandlesticksData[prevExtremum1.i].l || '1') / parseFloat(futuresCandlesticksData[prevExtremum2.i].h || '1')
+                    }
+                    prevExtremum1.i = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i, currentIndex, !isPrevMax);
+                    prevExtremum1.change = change;
                 }
             }
         }
