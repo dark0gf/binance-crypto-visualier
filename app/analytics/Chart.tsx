@@ -32,7 +32,7 @@ export default function Chart() {
         // const resContracts = await axios.get('/api/analytics/listContracts');
         // const contract = re
         // sContracts.data.contracts[0]
-        const contract = 'RVN_USDT';
+        const contract = 'ETH_USDT';
         console.log(contract);
 
         const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: ResultAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
