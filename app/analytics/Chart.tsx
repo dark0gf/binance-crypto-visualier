@@ -1,10 +1,12 @@
+import {useAsyncEffect} from "@/app/services/hooks";
+import {FuturesCandlestick} from "gate-api";
+import {TExtremum, TResultGateAnalyzedData} from "@/app/types/analysis";
+import {roundTo4Decimals} from "@/app/services/utils";
 import Plotly from "plotly.js";
 import React from "react";
-import {useAsyncEffect} from "@/app/services/hooks";
 import axios from "axios";
-import {FuturesCandlestick} from "gate-api";
-import {ResultGateAnalyzedData} from "@/app/types/analysis";
-import {roundTo4Decimals} from "@/app/services/utils";
+
+const plotyContainerId = 'ploty-container';
 
 const layout = {
     // dragmode: 'zoom',
@@ -27,15 +29,15 @@ const layout = {
 
 
 
-export default function Chart() {
+
+export function Chart(props: {contract?: string}) {
     useAsyncEffect(async () => {
-        // const resContracts = await axios.get('/api/analytics/listContracts');
-        // const contract = re
-        // sContracts.data.contracts[0]
-        const contract = 'ETH_USDT';
+        Plotly.purge(plotyContainerId);
+
+        const contract = props.contract;
         console.log(contract);
 
-        const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: ResultGateAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
+        const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: TResultGateAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
         console.log(resAnalytics.data);
         const candles = resAnalytics.data.candles;
         const tradeHigh: any = {
@@ -50,15 +52,7 @@ export default function Chart() {
         };
 
         for (let i in candles) {
-            // if (parseInt(i) < candles.length - 1000) {
-            //     continue;
-            // }
             const candle = candles[i];
-            // traceCandles.x.push((candle.t || 0) * 1000);
-            // traceCandles.open.push(candle.o);
-            // traceCandles.close.push(candle.c);
-            // traceCandles.low.push(candle.l);
-            // traceCandles.high.push(candle.h);
             tradeHigh.x.push((candle.t || 0) * 1000);
             tradeHigh.y.push(candle.h);
             tradeLow.x.push((candle.t || 0) * 1000);
@@ -81,31 +75,28 @@ export default function Chart() {
                 name: i,
             };
 
+            let prevExtremum: TExtremum | undefined;
             for (let e of result.extremumIndexes) {
-                traceResult.text.push(`Change: ${roundTo4Decimals(e.change)}, Percentile: ${roundTo4Decimals(e.percentile)}`);
+                let distance = prevExtremum ? (e.i - prevExtremum.i) : 'None';
+                traceResult.text.push(`Change: ${roundTo4Decimals(e.change)}, Distance: ${distance}, Percentile: ${roundTo4Decimals(e.percentile)}`);
                 traceResult.x.push((candles[e.i].t || 0) * 1000);
                 if (e.isMax) {
                     traceResult.y.push(candles[e.i].h);
                 } else {
                     traceResult.y.push(candles[e.i].l);
                 }
-
+                prevExtremum = e;
             }
             tracesResults.push(traceResult);
         }
 
         const config = {responsive: true};
+        Plotly.purge(plotyContainerId);
         // @ts-ignore
-        Plotly.newPlot('ploty-container', [tradeHigh, tradeLow, ...tracesResults], layout, config);
+        Plotly.newPlot(plotyContainerId, [tradeHigh, tradeLow, ...tracesResults], layout, config);
 
-    }, []);
+    }, [props.contract]);
 
-    return (<div id="ploty-container">
-        {/*// @ts-ignore*/}
-        {/*<Plot*/}
-        {/*    data={data}*/}
-        {/*    layout={layout}*/}
-        {/*    config={{responsive: true}}*/}
-        {/*/>*/}
-    </div>)
+    return (<div id={plotyContainerId}>
+    </div>);
 }

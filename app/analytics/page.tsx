@@ -2,19 +2,19 @@
 import React, {useEffect, useState} from 'react';
 
 export default function Analysis() {
-    const [Chart, setChart] = useState<any>();
+    const [Statistics, setStatistics] = useState<any>();
 
     useEffect(() => {
         (async () => {
-            const {default: Chart} = await import('./Chart');
-            setChart(<Chart />);
+            const {default: Statistics} = await import('./Statistics');
+            setStatistics(<Statistics />);
         })();
 
     }, []);
 
     return (
         <main className="h-full text-black">
-            {Chart}
+            {Statistics}
         </main>
     )
 }

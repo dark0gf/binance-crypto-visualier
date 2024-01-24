@@ -1,12 +1,19 @@
-export type ResultGateAnalyzedData = {
-    extremumIndexes: {isMax: boolean, i: number, change: number, percentile: number}[];
+export type TExtremum = {
+    isMax: boolean;
+    i: number;
+    change: number;
+    percentile: number;
+}
+
+export type TResultGateAnalyzedData = {
+    extremumIndexes: TExtremum[];
     highChange: number[];
     lowChange: number[];
 };
 
 
 //{<contractName>: {<windowSize>: {change, percentile}}]}
-export type ResultGateTotalAndLastCandle = {
+export type TResultGateTotalAndLastCandle = {
     [key: string]: {
         [key: string]: {
             change: number;

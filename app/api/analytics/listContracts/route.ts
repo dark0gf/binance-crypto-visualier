@@ -5,7 +5,6 @@ import {getContracts} from "@/app/services/gateioFutures";
 import {generateFileName} from "@/app/services/utilsIO";
 
 let cacheContractsResult: any = await (async () => {
-    console.log('Caching contracts');
     const contracts = await getContracts();
 
     const result: string[] = [];

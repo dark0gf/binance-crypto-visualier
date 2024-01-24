@@ -1,7 +1,7 @@
 import {FuturesCandlestick} from 'gate-api';
 import {createJSONFileManager, generateFileName, generateTotalFileName} from "@/app/services/utilsIO";
 import {getCandlesticks, getContracts} from "@/app/services/gateioFutures";
-import {ResultGateAnalyzedData, ResultGateTotalAndLastCandle} from "@/app/types/analysis";
+import {TResultGateAnalyzedData, TResultGateTotalAndLastCandle} from "@/app/types/analysis";
 import {gateioInterval, gateioSourceName} from "@/app/services/utils";
 
 declare class FuturesCandlestickFloat  {
@@ -27,6 +27,7 @@ declare class FuturesCandlestickFloat  {
 
 const startBackFrom = 365 * 24 * 60 * 60; //1 year
 const chunkTime = 5 * 24 * 60 * 60; //5 days
+const windowSizes = [4 * 12, 16 * 12, 64 * 12, 256 * 12]; //4 hours, 16 hours, ~2,5 day, ~10 days
 
 type TListFuturesCandlesticksOpt = {
     from?: number;
@@ -92,6 +93,8 @@ const percentileForValue = (sortedArr: number[], val: number) => {
 }
 
 (async () => {
+    const argvContractName = process.argv.slice(2)[0];
+
     //load data from gate.io
     const contracts = await getContracts();
     console.log('Total contracts', contracts.length);
@@ -100,6 +103,10 @@ const percentileForValue = (sortedArr: number[], val: number) => {
             console.error('Contract name is empty', contract);
             continue;
         }
+        if (argvContractName && contract.name !== argvContractName) {
+            continue;
+        }
+
         console.log('Processing contract', contract.name);
         const cacheFilename = generateFileName(gateioSourceName, contract.name || '', gateioInterval, false);
 
@@ -151,8 +158,7 @@ const percentileForValue = (sortedArr: number[], val: number) => {
 
 
         //analyze
-        const windowSizes = [4 * 12, 16 * 12, 64 * 12, 256 * 12]; //4 hours, 16 hours, ~2,5 day, ~10 days
-        const windowsSizeToData = new Map<number, ResultGateAnalyzedData>();
+        const windowsSizeToData = new Map<number, TResultGateAnalyzedData>();
         for (let ws of windowSizes) {
             windowsSizeToData.set(ws, {extremumIndexes: [], highChange: [], lowChange: []});
         }
@@ -220,7 +226,8 @@ const percentileForValue = (sortedArr: number[], val: number) => {
             console.log('Getting low and high change arrays');
             const lowChange: number[] = [];
             const highChange: number[] = [];
-            for (let extremum of data.extremumIndexes) {
+            // slice(1) - first change is 0 so need to skip it
+            for (let extremum of data.extremumIndexes.slice(1)) {
                 if (extremum.change > 1) {
                     highChange.push(extremum.change);
                 } else {
@@ -250,7 +257,7 @@ const percentileForValue = (sortedArr: number[], val: number) => {
         saveDataAnalysis(Object.fromEntries(windowsSizeToData));
 
         console.log('Preparing total data');
-        const {save: saveTotalAndLast, load: loadTotalAndLast} = createJSONFileManager<ResultGateTotalAndLastCandle>(generateTotalFileName(gateioSourceName, gateioInterval));
+        const {save: saveTotalAndLast, load: loadTotalAndLast} = createJSONFileManager<TResultGateTotalAndLastCandle>(generateTotalFileName(gateioSourceName, gateioInterval));
         let resultTotal = loadTotalAndLast();
         if (!resultTotal) {
             resultTotal = {};

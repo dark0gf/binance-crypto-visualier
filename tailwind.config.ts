@@ -16,5 +16,9 @@ const config: Config = {
     },
   },
   plugins: [],
+  safelist: [{
+    pattern: /grid-cols-\d/, // You can display all the colors that you need
+    variants: ['lg', 'hover', 'focus', 'lg:hover'],      // Optional
+  }]
 }
 export default config

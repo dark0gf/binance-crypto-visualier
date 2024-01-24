@@ -3,10 +3,6 @@ import {gateioInterval, gateioSourceName} from "@/app/services/utils";
 import {FuturesCandlestick} from "gate-api";
 import {createJSONFileManager, generateFileName} from "@/app/services/utilsIO";
 
-type ResponseData = {
-    message: string
-}
-
 export async function GET(req: NextApiRequest) {
     const url = new URL(req.url || '');
     const searchParams = new URLSearchParams(url.search)
