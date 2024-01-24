@@ -1,9 +1,29 @@
 import {FuturesCandlestick} from 'gate-api';
-import {createJSONFileManager, generateFileName} from "@/app/services/utilsIO";
+import {createJSONFileManager, generateFileName, generateTotalFileName} from "@/app/services/utilsIO";
 import {getCandlesticks, getContracts} from "@/app/services/gateioFutures";
-import {ResultAnalyzedData} from "@/app/types/analysis";
+import {ResultGateAnalyzedData, ResultGateTotalAndLastCandle} from "@/app/types/analysis";
 import {gateioInterval, gateioSourceName} from "@/app/services/utils";
 
+declare class FuturesCandlestickFloat  {
+    't'?: number;
+    'v'?: number;
+    'c'?: string | number;
+    'h'?: number;
+    'l'?: number;
+    'o'?: string;
+    'sum'?: string;
+    static discriminator: string | undefined;
+    static attributeTypeMap: Array<{
+        name: string;
+        baseName: string;
+        type: string;
+    }>;
+    static getAttributeTypeMap(): {
+        name: string;
+        baseName: string;
+        type: string;
+    }[];
+}
 
 const startBackFrom = 365 * 24 * 60 * 60; //1 year
 const chunkTime = 5 * 24 * 60 * 60; //5 days
@@ -39,17 +59,17 @@ const mergeCandleSticks = (candlesticks1: FuturesCandlestick[], candlesticks2: F
     return result;
 }
 
-const findMinMaxCandleIndex = (candles: FuturesCandlestick[], startFromIndex: number, toIndex: number, min: boolean): number => {
+const findMinMaxCandleIndex = (candles: FuturesCandlestickFloat[], startFromIndex: number, toIndex: number, min: boolean): number => {
     let result = startFromIndex;
     for (let i = startFromIndex; i <= toIndex; i++) {
         if (min) {
             // @ts-ignore
-            if (parseFloat(candles[i].l) < parseFloat(candles[result].l)) {
+            if (candles[i].l < candles[result].l) {
                 result = i;
             }
         } else {
             // @ts-ignore
-            if (parseFloat(candles[i].h) > parseFloat(candles[result].h)) {
+            if (candles[i].h > candles[result].h) {
                 result = i;
             }
         }
@@ -76,6 +96,10 @@ const percentileForValue = (sortedArr: number[], val: number) => {
     const contracts = await getContracts();
     console.log('Total contracts', contracts.length);
     for (let contract of contracts) {
+        if (!contract.name) {
+            console.error('Contract name is empty', contract);
+            continue;
+        }
         console.log('Processing contract', contract.name);
         const cacheFilename = generateFileName(gateioSourceName, contract.name || '', gateioInterval, false);
 
@@ -94,12 +118,13 @@ const percentileForValue = (sortedArr: number[], val: number) => {
 
         let stop = false;
         while (!stop) {
-            if (lastTimestamp > getCurrentTimestamp()) {
-                lastTimestamp = getCurrentTimestamp();
+            const from = lastTimestamp;
+            let to = lastTimestamp + chunkTime;
+
+            if (to > getCurrentTimestamp()) {
+                to = getCurrentTimestamp();
                 stop = true;
             }
-            const from = lastTimestamp - chunkTime;
-            const to = lastTimestamp;
             console.log('getting from to', new Date(from * 1000), new Date(to * 1000));
             const opts: TListFuturesCandlesticksOpt = {
                 'from': from,
@@ -118,17 +143,21 @@ const percentileForValue = (sortedArr: number[], val: number) => {
             lastTimestamp += chunkTime;
         }
         console.log('Total candlesticks', futuresCandlesticksData.length);
+        const futuresCandlesticksFloatData: FuturesCandlestickFloat[] = futuresCandlesticksData.map(c => {
+            const newCandle = {...c, h: parseFloat(c.h || '0'), l: parseFloat(c.l || '0')};
+            return newCandle;
+        })
 
 
 
         //analyze
         const windowSizes = [4 * 12, 16 * 12, 64 * 12, 256 * 12]; //4 hours, 16 hours, ~2,5 day, ~10 days
-        const windowsSizeToData = new Map<number, ResultAnalyzedData>();
+        const windowsSizeToData = new Map<number, ResultGateAnalyzedData>();
         for (let ws of windowSizes) {
-            windowsSizeToData.set(ws, {extremumIndexes: []});
+            windowsSizeToData.set(ws, {extremumIndexes: [], highChange: [], lowChange: []});
         }
 
-        for (let currentIndex= 0; currentIndex <  futuresCandlesticksData.length; currentIndex++) {
+        for (let currentIndex= 0; currentIndex <  futuresCandlesticksFloatData.length; currentIndex++) {
             for (let windowSize of windowSizes) {
                 const data = windowsSizeToData.get(windowSize);
                 if (!data) {
@@ -139,43 +168,43 @@ const percentileForValue = (sortedArr: number[], val: number) => {
                 }
                 if (data.extremumIndexes.length === 0) {
                     //empty array, starting to fill with first 2 items
-                    let minIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, true);
-                    let maxIndex = findMinMaxCandleIndex(futuresCandlesticksData, currentIndex - windowSize, currentIndex, false);
+                    let minIndex = findMinMaxCandleIndex(futuresCandlesticksFloatData, currentIndex - windowSize, currentIndex, true);
+                    let maxIndex = findMinMaxCandleIndex(futuresCandlesticksFloatData, currentIndex - windowSize, currentIndex, false);
                     if (minIndex < maxIndex) {
-                        const change = parseFloat(futuresCandlesticksData[maxIndex].h || '1') / parseFloat(futuresCandlesticksData[minIndex].l || '1');
+                        const change = (futuresCandlesticksFloatData[maxIndex].h || 1) / (futuresCandlesticksFloatData[minIndex].l || 1);
                         data.extremumIndexes.push({isMax: false, i: minIndex, change: 0, percentile: -1}, {isMax: true, i: maxIndex, change, percentile: -1});
                     } else {
-                        const change = parseFloat(futuresCandlesticksData[minIndex].l || '1') / parseFloat(futuresCandlesticksData[maxIndex].h || '1');
+                        const change = (futuresCandlesticksFloatData[minIndex].l || 1) / (futuresCandlesticksFloatData[maxIndex].h || 1);
                         data.extremumIndexes.push({isMax: true, i: maxIndex, change: 0, percentile: -1}, {isMax: false, i: minIndex, change, percentile: -1});
                     }
                 } else {
                     const prevExtremum1 = data.extremumIndexes[data.extremumIndexes.length - 1];
                     const prevExtremum2 = data.extremumIndexes[data.extremumIndexes.length - 2];
-                    if (!futuresCandlesticksData[prevExtremum1.i] || !futuresCandlesticksData[prevExtremum2.i]) {
-                        throw Error(`Out of bounds ${prevExtremum1.i} ${prevExtremum2.i} ${futuresCandlesticksData.length}`);
+                    if (!futuresCandlesticksFloatData[prevExtremum1.i] || !futuresCandlesticksFloatData[prevExtremum2.i]) {
+                        throw Error(`Out of bounds ${prevExtremum1.i} ${prevExtremum2.i} ${futuresCandlesticksFloatData.length}`);
                     }
 
                     // @ts-ignore
-                    let isPrevMax = prevExtremum1.isMax;//futuresCandlesticksData[prevIndex2].l < futuresCandlesticksData[prevIndex1].l
+                    let isPrevMax = prevExtremum1.isMax;
                     if (prevExtremum2.i < currentIndex - windowSize) {
-                        const nextLocalExtremumIndex = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i + 1, currentIndex, isPrevMax);
-                        const nextLocalExtremumCandle = futuresCandlesticksData[nextLocalExtremumIndex];
+                        const nextLocalExtremumIndex = findMinMaxCandleIndex(futuresCandlesticksFloatData, prevExtremum1.i + 1, currentIndex, isPrevMax);
+                        const nextLocalExtremumCandle = futuresCandlesticksFloatData[nextLocalExtremumIndex];
                         const isMax = !isPrevMax;
                         let change
                         if (isMax) {
-                            change = parseFloat(nextLocalExtremumCandle.h || '1') / parseFloat(futuresCandlesticksData[prevExtremum1.i].l || '1')
+                            change = (nextLocalExtremumCandle.h || 1) / (futuresCandlesticksFloatData[prevExtremum1.i].l || 1);
                         } else {
-                            change = parseFloat(nextLocalExtremumCandle.l || '1') / parseFloat(futuresCandlesticksData[prevExtremum1.i].h || '1')
+                            change = (nextLocalExtremumCandle.l || 1) / (futuresCandlesticksFloatData[prevExtremum1.i].h || 1)
                         }
                         data.extremumIndexes.push({isMax, i: nextLocalExtremumIndex, change, percentile: -1});
                     } else {
                         let change;
                         if (prevExtremum1.isMax) {
-                            change = parseFloat(futuresCandlesticksData[prevExtremum1.i].h || '1') / parseFloat(futuresCandlesticksData[prevExtremum2.i].l || '1')
+                            change = (futuresCandlesticksFloatData[prevExtremum1.i].h || 1) / (futuresCandlesticksFloatData[prevExtremum2.i].l || 1)
                         } else {
-                            change = parseFloat(futuresCandlesticksData[prevExtremum1.i].l || '1') / parseFloat(futuresCandlesticksData[prevExtremum2.i].h || '1')
+                            change = (futuresCandlesticksFloatData[prevExtremum1.i].l || 1) / (futuresCandlesticksFloatData[prevExtremum2.i].h || 1)
                         }
-                        prevExtremum1.i = findMinMaxCandleIndex(futuresCandlesticksData, prevExtremum1.i, currentIndex, !isPrevMax);
+                        prevExtremum1.i = findMinMaxCandleIndex(futuresCandlesticksFloatData, prevExtremum1.i, currentIndex, !isPrevMax);
                         prevExtremum1.change = change;
                     }
                 }
@@ -210,14 +239,70 @@ const percentileForValue = (sortedArr: number[], val: number) => {
                     extremum.percentile = percentileForValue(lowChange, extremum.change);
                 }
             }
+            data.lowChange = lowChange;
+            data.highChange = highChange;
         }
 
 
-        console.log('saving');
+        console.log('saving analysis data');
 
         const {save: saveDataAnalysis} = createJSONFileManager(generateFileName(gateioSourceName, contract.name || '', gateioInterval, true));
         saveDataAnalysis(Object.fromEntries(windowsSizeToData));
 
+        console.log('Preparing total data');
+        const {save: saveTotalAndLast, load: loadTotalAndLast} = createJSONFileManager<ResultGateTotalAndLastCandle>(generateTotalFileName(gateioSourceName, gateioInterval));
+        let resultTotal = loadTotalAndLast();
+        if (!resultTotal) {
+            resultTotal = {};
+        }
+
+        resultTotal[contract.name] = {};
+        const wstdo = Object.fromEntries(windowsSizeToData);
+        for (let ws in wstdo) {
+            const result = wstdo[ws];
+            if (result.extremumIndexes.length < 2) {
+                continue;
+            }
+
+            //time ------------------------------------------------------------>
+            //candles prev2candleExtremum ---> prev1candleExtremum -> lastCandle
+            const prev1Extremum = result.extremumIndexes[result.extremumIndexes.length - 1];
+            const prev2Extremum = result.extremumIndexes[result.extremumIndexes.length - 2];
+            const prev1candleExtremum = futuresCandlesticksFloatData[prev1Extremum.i];
+            const prev2candleExtremum = futuresCandlesticksFloatData[prev2Extremum.i];
+            const lastCandle = {...futuresCandlesticksFloatData[futuresCandlesticksFloatData.length - 1]};
+            if (typeof lastCandle.c === "string") {
+                lastCandle.c = parseFloat(lastCandle.c || '0');
+            }
+
+            let change;
+            let percentile;
+            if (prev2Extremum.isMax) {
+                if ((lastCandle.c || 0) > (prev2candleExtremum.h || 0)) {
+                    // prev2candleExtremum.h = 3.71, prev1candleExtremum.l = 2.13, lastCandle.c = 3.98 (getting change from prev1 to last)
+                    change = (lastCandle.c || 1) / (prev1candleExtremum.l || 1);
+                    percentile = percentileForValue(result.highChange, change);
+                } else {
+                    // prev2candleExtremum.h = 3.71, prev1candleExtremum.l = 2.13, lastCandle.c = 3.10 (getting change from prev2 to last)
+                    change = (lastCandle.c || 1) / (prev2candleExtremum.h || 1);
+                    percentile = percentileForValue(result.lowChange, change);
+                }
+            } else {
+                    // prev2candleExtremum.l = 2.08, prev1candleExtremum.l = 3.64, lastCandle.c = 1.15 (getting change from prev1 to last)
+                if ((lastCandle.c || 0) < (prev2candleExtremum.l || 0)) {
+                    change = (lastCandle.c || 1) / (prev1candleExtremum.h || 1);
+                    percentile = percentileForValue(result.lowChange, change);
+                } else {
+                    // prev2candleExtremum.l = 2.08, prev1candleExtremum.l = 3.64, lastCandle.c = 3.25 (getting change from prev2 to last)
+                    change = (lastCandle.c || 1) / (prev2candleExtremum.l || 1);
+                    percentile = percentileForValue(result.highChange, change);
+                }
+            }
+            resultTotal[contract.name][ws] = {change, percentile};
+
+        }
+
+        saveTotalAndLast(resultTotal);
         console.log('done');
     }
 })();

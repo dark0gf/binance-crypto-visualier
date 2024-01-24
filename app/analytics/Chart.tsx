@@ -3,7 +3,7 @@ import React from "react";
 import {useAsyncEffect} from "@/app/services/hooks";
 import axios from "axios";
 import {FuturesCandlestick} from "gate-api";
-import {ResultAnalyzedData} from "@/app/types/analysis";
+import {ResultGateAnalyzedData} from "@/app/types/analysis";
 import {roundTo4Decimals} from "@/app/services/utils";
 
 const layout = {
@@ -35,7 +35,7 @@ export default function Chart() {
         const contract = 'ETH_USDT';
         console.log(contract);
 
-        const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: ResultAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
+        const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: ResultGateAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
         console.log(resAnalytics.data);
         const candles = resAnalytics.data.candles;
         const tradeHigh: any = {
