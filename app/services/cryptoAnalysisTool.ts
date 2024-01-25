@@ -7,10 +7,10 @@ import {gateioInterval, gateioSourceName} from "@/app/services/utils";
 declare class FuturesCandlestickFloat  {
     't'?: number;
     'v'?: number;
-    'c'?: string | number;
-    'h'?: number;
-    'l'?: number;
-    'o'?: string;
+    'c': number;
+    'h': number;
+    'l': number;
+    'o': number;
     'sum'?: string;
     static discriminator: string | undefined;
     static attributeTypeMap: Array<{
@@ -155,7 +155,13 @@ const percentileForValue = (sortedArr: number[], val: number) => {
         }
         console.log('Total candlesticks', futuresCandlesticksData.length);
         const futuresCandlesticksFloatData: FuturesCandlestickFloat[] = futuresCandlesticksData.map(c => {
-            const newCandle = {...c, h: parseFloat(c.h || '0'), l: parseFloat(c.l || '0')};
+            const newCandle = {
+                ...c,
+                h: parseFloat(c.h || '0'),
+                l: parseFloat(c.l || '0'),
+                o: parseFloat(c.o || '0'),
+                c: parseFloat(c.c || '0'),
+            };
             return newCandle;
         })
 
@@ -284,26 +290,23 @@ const percentileForValue = (sortedArr: number[], val: number) => {
             const prev1candleExtremum = futuresCandlesticksFloatData[prev1Extremum.i];
             const prev2candleExtremum = futuresCandlesticksFloatData[prev2Extremum.i];
             const lastCandle = {...futuresCandlesticksFloatData[futuresCandlesticksFloatData.length - 1]};
-            if (typeof lastCandle.c === "string") {
-                lastCandle.c = parseFloat(lastCandle.c || '0');
-            }
 
             let change;
             let percentile;
             if (prev2Extremum.isMax) {
-                if ((lastCandle.c || 0) > (prev2candleExtremum.h || 0)) {
+                if (lastCandle.c  > prev2candleExtremum.h) {
                     // prev2candleExtremum.h = 3.71, prev1candleExtremum.l = 2.13, lastCandle.c = 3.98 (getting change from prev1 to last)
-                    change = (lastCandle.c || 1) / (prev1candleExtremum.l || 1);
+                    change = lastCandle.c / prev1candleExtremum.l;
                     percentile = percentileForValue(result.highChange, change);
                 } else {
                     // prev2candleExtremum.h = 3.71, prev1candleExtremum.l = 2.13, lastCandle.c = 3.10 (getting change from prev2 to last)
-                    change = (lastCandle.c || 1) / (prev2candleExtremum.h || 1);
+                    change = lastCandle.c / prev2candleExtremum.h;
                     percentile = percentileForValue(result.lowChange, change);
                 }
             } else {
                     // prev2candleExtremum.l = 2.08, prev1candleExtremum.l = 3.64, lastCandle.c = 1.15 (getting change from prev1 to last)
-                if ((lastCandle.c || 0) < (prev2candleExtremum.l || 0)) {
-                    change = (lastCandle.c || 1) / (prev1candleExtremum.h || 1);
+                if (lastCandle.c < prev2candleExtremum.l) {
+                    change = lastCandle.c / prev1candleExtremum.h;
                     percentile = percentileForValue(result.lowChange, change);
                 } else {
                     // prev2candleExtremum.l = 2.08, prev1candleExtremum.l = 3.64, lastCandle.c = 3.25 (getting change from prev2 to last)
@@ -319,8 +322,3 @@ const percentileForValue = (sortedArr: number[], val: number) => {
         console.log('done');
     }
 })();
-
-
-/**
- Hi, futures api seems to return wrong results (https://www.gate.io/docs/developers/apiv4/#get-futures-candlesticks), here is request example where I get all candlestick with sum 0 and same open close high and low price https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=HNT_USDT&from=1698704700&to=1698711000&interval=5m
- */
