@@ -63,7 +63,7 @@ export default function Statistics() {
                     {Object.keys(dataResults?.result ?? [])
                     .filter((contractName) => (dataResults?.result?.[contractName]?.[sortByWindowSize]?.change ?? 0) > 1)
                     .sort((contractNameA, contractNameB) => (
-                        (dataResults?.result?.[contractNameB]?.[sortByWindowSize]?.percentile || 1) - (dataResults?.result?.[contractNameA]?.[sortByWindowSize]?.percentile || 1)
+                        (dataResults?.result?.[contractNameB]?.[sortByWindowSize]?.percentile ?? 1) - (dataResults?.result?.[contractNameA]?.[sortByWindowSize]?.percentile ?? 1)
                     ))
                     .map((contractName) => (<>
                         <div key={contractName}>
@@ -85,7 +85,7 @@ export default function Statistics() {
                     {Object.keys(dataResults?.result ?? [])
                         .filter((contractName) => (dataResults?.result?.[contractName]?.[sortByWindowSize]?.change ?? 0) < 1)
                         .sort((contractNameA, contractNameB) => (
-                            (dataResults?.result?.[contractNameA]?.[sortByWindowSize]?.percentile || 1) - (dataResults?.result?.[contractNameB]?.[sortByWindowSize]?.percentile || 1)
+                            (dataResults?.result?.[contractNameA]?.[sortByWindowSize]?.percentile ?? 1) - (dataResults?.result?.[contractNameB]?.[sortByWindowSize]?.percentile ?? 1)
                         ))
                         .map((contractName) => (<>
                                 <div key={contractName}>
