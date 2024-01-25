@@ -12,12 +12,18 @@ export type TResultGateAnalyzedData = {
 };
 
 
-//{<contractName>: {<windowSize>: {change, percentile}}]}
+//result: {<contractName>: {<windowSize>: {change, percentile}}]}
+//totalCandles: {<contractName>: <number of total candles analized>}
 export type TResultGateTotalAndLastCandle = {
-    [key: string]: {
+    totalCandles: {
+        [key: string]: number
+    };
+    result: {
         [key: string]: {
-            change: number;
-            percentile: number;
+            [key: string]: {
+                change: number;
+                percentile: number;
+            }
         }
     }
 }

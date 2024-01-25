@@ -140,7 +140,11 @@ const percentileForValue = (sortedArr: number[], val: number) => {
             };
 
             try {
-                const candlesticks = await getCandlesticks(contract.name || '', opts);
+                const candlesticks = (await getCandlesticks(contract.name || '', opts))
+                    .filter(c => {
+                        return c.h !== c.l; //TODO: possible bug gate.io?
+                        //return c.sum != '0';
+                    });
                 futuresCandlesticksData = mergeCandleSticks(futuresCandlesticksData, candlesticks);
                 saveData(futuresCandlesticksData);
             } catch (e) {
@@ -260,10 +264,12 @@ const percentileForValue = (sortedArr: number[], val: number) => {
         const {save: saveTotalAndLast, load: loadTotalAndLast} = createJSONFileManager<TResultGateTotalAndLastCandle>(generateTotalFileName(gateioSourceName, gateioInterval));
         let resultTotal = loadTotalAndLast();
         if (!resultTotal) {
-            resultTotal = {};
+            resultTotal = {totalCandles: {}, result: {}};
         }
 
-        resultTotal[contract.name] = {};
+        resultTotal.result[contract.name] = {};
+        resultTotal.totalCandles[contract.name] = futuresCandlesticksFloatData.length;
+
         const wstdo = Object.fromEntries(windowsSizeToData);
         for (let ws in wstdo) {
             const result = wstdo[ws];
@@ -305,7 +311,7 @@ const percentileForValue = (sortedArr: number[], val: number) => {
                     percentile = percentileForValue(result.highChange, change);
                 }
             }
-            resultTotal[contract.name][ws] = {change, percentile};
+            resultTotal.result[contract.name][ws] = {change, percentile};
 
         }
 
@@ -313,3 +319,8 @@ const percentileForValue = (sortedArr: number[], val: number) => {
         console.log('done');
     }
 })();
+
+
+/**
+ Hi, futures api seems to return wrong results (https://www.gate.io/docs/developers/apiv4/#get-futures-candlesticks), here is request example where I get all candlestick with sum 0 and same open close high and low price https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=HNT_USDT&from=1698704700&to=1698711000&interval=5m
+ */
