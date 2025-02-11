@@ -5,6 +5,7 @@ import {roundTo4Decimals} from "@/app/services/utils";
 import Plotly from "plotly.js";
 import React from "react";
 import axios from "axios";
+import ContractStatistics from "@/app/analytics/ContractStatistics";
 
 const plotyContainerId = 'ploty-container';
 
@@ -27,17 +28,20 @@ const layout = {
     }
 };
 
+type TAnalyticsResult = {
+    candles: FuturesCandlestick[],
+    result: { [key: string]: TResultGateAnalyzedData }
+};
 
-
-
-export function Chart(props: {contract?: string}) {
+export function Chart(props: { contract?: string }) {
     useAsyncEffect(async () => {
         Plotly.purge(plotyContainerId);
 
         const contract = props.contract;
         console.log(contract);
 
-        const resAnalytics = await axios.get<{candles: FuturesCandlestick[], result: {[key: string]: TResultGateAnalyzedData}}>(`/api/analytics/result?contract=${contract}`);
+        const resAnalytics = await axios.get<TAnalyticsResult>(`/api/analytics/result?contract=${contract}`);
+
         console.log(resAnalytics.data);
         const candles = resAnalytics.data.candles;
         const tradeHigh: any = {
@@ -51,7 +55,13 @@ export function Chart(props: {contract?: string}) {
             mode: 'lines',
         };
 
+        //limit for display work smothly
+        // const candlesWithLimit = candles.slice(-20000);
+
         for (let i in candles) {
+            if (candles.length - parseInt(i) > 30000) {
+                continue;
+            }
             const candle = candles[i];
             tradeHigh.x.push((candle.t || 0) * 1000);
             tradeHigh.y.push(candle.h);
@@ -77,6 +87,9 @@ export function Chart(props: {contract?: string}) {
 
             let prevExtremum: TExtremum | undefined;
             for (let e of result.extremumIndexes) {
+                if (candles.length - e.i > 30000) {
+                    continue;
+                }
                 let distance = prevExtremum ? (e.i - prevExtremum.i) : 'None';
                 traceResult.text.push(`Change: ${roundTo4Decimals(e.change)}, Distance: ${distance}, Percentile: ${roundTo4Decimals(e.percentile)}`);
                 traceResult.x.push((candles[e.i].t || 0) * 1000);
@@ -97,6 +110,10 @@ export function Chart(props: {contract?: string}) {
 
     }, [props.contract]);
 
-    return (<div id={plotyContainerId}>
+    return (<div>
+        <div id={plotyContainerId}>
+        </div>
+
+        {/*<ContractStatistics results={dataResults}/>*/}
     </div>);
 }

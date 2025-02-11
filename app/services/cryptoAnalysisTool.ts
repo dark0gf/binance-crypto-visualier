@@ -25,7 +25,7 @@ declare class FuturesCandlestickFloat  {
     }[];
 }
 
-const startBackFrom = 365 * 24 * 60 * 60; //1 year
+const startBackFrom = 365 * 24 * 60 * 60 * 2; //2 years
 const chunkTime = 5 * 24 * 60 * 60; //5 days
 const windowSizes = [4 * 12, 16 * 12, 64 * 12, 256 * 12]; //4 hours, 16 hours, ~2,5 day, ~10 days
 
@@ -98,7 +98,8 @@ const percentileForValue = (sortedArr: number[], val: number) => {
     //load data from gate.io
     const contracts = await getContracts();
     console.log('Total contracts', contracts.length);
-    for (let contract of contracts) {
+    for (let contractIndex in contracts) {
+        const contract = contracts[contractIndex];
         if (!contract.name) {
             console.error('Contract name is empty', contract);
             continue;
@@ -107,7 +108,7 @@ const percentileForValue = (sortedArr: number[], val: number) => {
             continue;
         }
 
-        console.log('Processing contract', contract.name);
+        console.log(`Processing contract: ${contract.name} (${contractIndex}/${contracts.length - 1})`);
         const cacheFilename = generateFileName(gateioSourceName, contract.name || '', gateioInterval, false);
 
         const {save: saveData, load: loadData} = createJSONFileManager<FuturesCandlestick[]>(cacheFilename);
@@ -141,10 +142,11 @@ const percentileForValue = (sortedArr: number[], val: number) => {
 
             try {
                 const candlesticks = (await getCandlesticks(contract.name || '', opts))
-                    .filter(c => {
-                        return c.h !== c.l; //TODO: possible bug gate.io?
-                        //return c.sum != '0';
-                    });
+                    //sometimes there is no trade for 5 mins so we no need to skip this
+                    // .filter(c => {
+                    //     return c.h !== c.l; //TODO: possible bug gate.io?
+                    //     //return c.sum != '0';
+                    // });
                 futuresCandlesticksData = mergeCandleSticks(futuresCandlesticksData, candlesticks);
                 saveData(futuresCandlesticksData);
             } catch (e) {
